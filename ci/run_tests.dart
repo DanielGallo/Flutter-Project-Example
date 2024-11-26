@@ -3,14 +3,16 @@ import 'dart:io';
 
 void main() async {
   final testNames = <int, String>{};
+  final activeTests = <int>{}; // Track active test IDs
 
-  // Start the test process with JSON reporter
+  // Start the test process with JSON reporter and sequential execution
   final process = await Process.start(
     'flutter',
-    ['test', '--reporter', 'json'],
+    ['test', '--reporter', 'json', '--concurrency=1'],
     runInShell: true,
   );
 
+  // Process JSON output line by line
   process.stdout
       .transform(utf8.decoder)
       .transform(LineSplitter())
@@ -19,12 +21,13 @@ void main() async {
 
     try {
       final event = jsonDecode(line);
-      _handleEvent(event, testNames);
+      _handleEvent(event, testNames, activeTests);
     } catch (e) {
       // Ignore non-JSON lines
     }
   });
 
+  // Log errors from stderr
   process.stderr
       .transform(utf8.decoder)
       .transform(LineSplitter())
@@ -32,11 +35,13 @@ void main() async {
     print("##teamcity[message text='${_escape(line)}' status='ERROR']");
   });
 
+  // Wait for the test process to exit
   final exitCode = await process.exitCode;
   exit(exitCode);
 }
 
-void _handleEvent(Map<String, dynamic> event, Map<int, String> testNames) {
+void _handleEvent(
+    Map<String, dynamic> event, Map<int, String> testNames, Set<int> activeTests) {
   final type = event['type'];
 
   switch (type) {
@@ -46,12 +51,12 @@ void _handleEvent(Map<String, dynamic> event, Map<int, String> testNames) {
         final id = test['id'];
         final name = _escape(test['name'] ?? '');
 
-        // Ignore tests that are "loading <file path>"
         if (name.startsWith('loading ')) {
-          return;
+          return; // Ignore loading events
         }
 
         testNames[id] = name; // Store the test name for this ID
+        activeTests.add(id); // Mark test as active
         print("##teamcity[testStarted name='$name']");
       }
       break;
@@ -60,11 +65,8 @@ void _handleEvent(Map<String, dynamic> event, Map<int, String> testNames) {
       final id = event['testID'];
       final name = testNames[id]; // Retrieve the test name using the ID
 
-      if (name != null) {
-        if (name.startsWith('loading ')) {
-          return; // Ignore suite loading test completions
-        }
-
+      if (name != null && activeTests.contains(id)) {
+        // Ensure test is active before marking it as finished
         if (event['result'] == 'error' || event['result'] == 'failure') {
           final message = _escape(event['error'] ?? '');
           final details = _escape(event['stackTrace'] ?? '');
@@ -77,6 +79,7 @@ void _handleEvent(Map<String, dynamic> event, Map<int, String> testNames) {
         }
 
         print("##teamcity[testFinished name='$name']");
+        activeTests.remove(id); // Mark test as finished
       }
       break;
 
@@ -91,11 +94,9 @@ void _handleEvent(Map<String, dynamic> event, Map<int, String> testNames) {
       final suite = event['suite'];
       final path = suite['path'] ?? '';
 
-      // Ignore suite loading events
       if (path.isNotEmpty) {
-        return;
+        return; // Ignore suite loading events
       }
-
       break;
 
     case 'print':
