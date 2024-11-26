@@ -75,6 +75,7 @@ platform :ios do
     )
 
     increment_version_number(
+      xcodeproj: "ios/Runner.xcodeproj",
       version_number: options[:version_number]
     )
   end
