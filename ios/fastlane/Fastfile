@@ -66,7 +66,7 @@ platform :ios do
 
     # Update the project and code signing settings
     update_code_signing_settings(
-      path: "ios/Runner.xcodeproj",
+      path: "Runner.xcodeproj",
       use_automatic_signing: false,
       team_id: options[:team_id],
       bundle_identifier: options[:bundle_identifier],
@@ -75,7 +75,7 @@ platform :ios do
     )
 
     increment_version_number(
-      xcodeproj: "ios/Runner.xcodeproj",
+      xcodeproj: "Runner.xcodeproj",
       version_number: options[:version_number]
     )
   end
