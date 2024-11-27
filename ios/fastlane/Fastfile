@@ -82,7 +82,7 @@ platform :ios do
 
   lane :build_ipa do |options|
     build_app(
-      output_name: "SampleFlutterApp.ipa"
+      output_name: "ipa/SampleFlutterApp.ipa"
     )
   end
 end
