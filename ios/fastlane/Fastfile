@@ -86,4 +86,5 @@ platform :ios do
       output_name: "SampleFlutterApp.ipa"
     )
   end
+
 end
