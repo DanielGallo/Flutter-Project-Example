@@ -78,7 +78,9 @@ platform :ios do
       xcodeproj: "Runner.xcodeproj",
       version_number: options[:version_number]
     )
+  end
 
+  lane :build_ipa do |options|
     build_app(
       output_name: "SampleFlutterApp.ipa"
     )
