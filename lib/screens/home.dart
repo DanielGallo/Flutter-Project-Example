@@ -17,7 +17,7 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Testing Sample for AWS re:Invent'),
+        title: const Text('Testing Sample for AWS re:Invent Demo'),
         actions: [
           TextButton.icon(
             onPressed: () {

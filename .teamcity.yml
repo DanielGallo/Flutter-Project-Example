@@ -1,0 +1,176 @@
+name: Flutter Example App
+jobs:
+  Job1:
+    name: Run Tests
+    steps:
+      - type: script
+        script-content: dart ci/run_tests.dart
+        docker-image: instrumentisto/flutter:3.24.5
+        name: Run Flutter tests
+    runs-on: Linux-Medium
+  Job1_2:
+    name: Build Web
+    runs-on: Linux-Medium
+    steps:
+      - type: script
+        docker-image: instrumentisto/flutter:3.24.5
+        script-content: flutter build web
+        name: Run Flutter build
+    dependencies:
+      - Job1
+    files-publication:
+      - build/web/**/*
+  Job1_3:
+    name: Build iOS
+    runs-on: macOS-14-Sonoma-Medium-Arm64
+    steps:
+      - type: script
+        script-content: |-
+          if ! command -v flutter &>/dev/null; then
+              echo "Flutter is not installed. Installing Flutter..."
+              brew install flutter
+          else
+              echo "Flutter is already installed."
+          fi
+        name: Install Flutter
+      - type: script
+        script-content: |-
+          mkdir -p fastlane/tmp
+
+          aws secretsmanager get-secret-value \
+              --secret-id FlutterApp_Signing_Certificate_Private_Key \
+              --output text \
+              --query SecretBinary | base64 -d -o fastlane/tmp/private.p12
+
+          aws secretsmanager get-secret-value \
+              --secret-id FlutterApp_Signing_Certificate \
+              --output text \
+              --query SecretBinary | base64 -d -o fastlane/tmp/signing.cer
+          
+          aws secretsmanager get-secret-value \
+              --secret-id FlutterApp_Provisioning_Profile \
+              --output text \
+              --query SecretBinary | base64 -d -o fastlane/tmp/FlutterApp.mobileprovision
+        name: Get secrets from AWS Secrets Manager
+        working-directory: ios
+      - type: script
+        name: Get Apple CA certificates
+        script-content: >-
+          curl
+          https://developer.apple.com/certificationauthority/AppleWWDRCA.cer \
+              --output fastlane/tmp/AppleWWDRCA.cer
+          
+          curl https://www.apple.com/certificateauthority/AppleWWDRCAG2.cer \
+              --output fastlane/tmp/AppleWWDRCAG2.cer
+          
+          curl https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer \
+              --output fastlane/tmp/AppleWWDRCAG3.cer
+          
+          curl https://www.apple.com/certificateauthority/AppleWWDRCAG4.cer \
+              --output fastlane/tmp/AppleWWDRCAG4.cer
+          
+          curl https://www.apple.com/certificateauthority/AppleWWDRCAG5.cer \
+              --output fastlane/tmp/AppleWWDRCAG5.cer
+          
+          curl https://www.apple.com/certificateauthority/AppleWWDRCAG6.cer \
+              --output fastlane/tmp/AppleWWDRCAG6.cer
+        working-directory: ios
+      - type: script
+        script-content: >-
+          TEAM_ID=`aws secretsmanager get-secret-value \
+              --secret-id FlutterApp_Team_ID \
+              --output text \
+              --query 'SecretString' | cut -d '"' -f4`
+          
+          APP_BUNDLE=`aws secretsmanager get-secret-value \
+              --secret-id FlutterApp_App_Bundle \
+              --output text \
+              --query 'SecretString' | cut -d '"' -f4`
+          
+          PASSPHRASE=`aws secretsmanager get-secret-value \
+              --secret-id FlutterApp_Signing_Certificate_Private_Key_Passphrase \
+              --output text \
+              --query 'SecretString' | cut -d '"' -f4`
+          
+          # Decode provisioning profile (to get its name)
+
+          security cms -D -i fastlane/tmp/FlutterApp.mobileprovision >
+          fastlane/tmp/App.plist
+          
+          # Extract name from decoded provisioning profile
+
+          PROFILE_NAME=`/usr/libexec/PlistBuddy -c "Print :Name"
+          fastlane/tmp/App.plist`
+          
+          fastlane update_project_settings \
+              bundle_identifier:"$APP_BUNDLE" \
+              code_sign_identity:"Apple Distribution" \
+              certificate_password:"$PASSPHRASE" \
+              provisioning_profile_name:"$PROFILE_NAME" \
+              team_id:"$TEAM_ID" \
+              version_number:"%build.number%"
+        name: Update Xcode project settings
+        working-directory: ios
+      - type: script
+        script-content: flutter build ios
+        name: Flutter build app bundle
+      - type: script
+        working-directory: ios
+        script-content: fastlane build_ipa
+    dependencies:
+      - Job1
+    files-publication:
+      - ios/ipa/**/*
+  Job1_4:
+    name: Build macOS
+    runs-on: macOS-14-Sonoma-Medium-Arm64
+    steps:
+      - type: script
+        script-content: |-
+          if ! command -v flutter &>/dev/null; then
+              echo "Flutter is not installed. Installing Flutter..."
+              brew install flutter
+          else
+              echo "Flutter is already installed."
+          fi
+        name: Install Flutter
+      - type: script
+        name: Run Flutter build
+        script-content: flutter build macos
+    dependencies:
+      - Job1
+    files-publication:
+      - build/macos/Build/Products/Release/**/*
+  Job1_5:
+    name: Deploy Web to Staging
+    runs-on: Linux-Medium
+    dependencies:
+      - Job1_2:
+          files:
+            - build/web/**/*
+    steps:
+      - type: script
+        script-content: |-
+          echo "Deploying to S3 bucket"
+
+          aws s3 sync build/web s3://danielgallo-flutter-app-demo
+        name: Publish to S3 bucket
+  Job1_6:
+    name: Build Android
+    runs-on: Linux-Medium
+    dependencies:
+      - Job1
+    steps:
+      - type: script
+        name: Run Flutter build
+        script-content: flutter build apk
+        docker-image: instrumentisto/flutter:3.24.5
+    files-publication:
+      - build/app/outputs/flutter-apk/**/*
+secrets:
+  env.AWS_ACCESS_KEY_ID: credentialsJSON:09e0ab80-ad67-47a0-aba7-36020d78a319
+  env.AWS_SECRET_ACCESS_KEY: credentialsJSON:a7fb41c1-7d83-481b-9d42-b355b3aa40b8
+parameters:
+  env.AWS_DEFAULT_REGION: eu-west-1
+  env.LANG: en_US.UTF-8
+  env.LC_ALL: en_US.UTF-8
