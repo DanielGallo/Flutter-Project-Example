@@ -1,9 +1,9 @@
-# Flutter Project Example
+# Flutter project example for TeamCity Pipelines
 
 A sample Flutter app based on [this example](https://github.com/flutter/samples/tree/main/testing_app).
 
-This version of the app is configured to build in TeamCity Pipelines using the 
-corresponding [`.teamcity.yml`](.teamcity.yml) file.
+This version of the app is configured to build in [TeamCity Pipelines](https://www.jetbrains.com/teamcity/pipelines/) 
+using the corresponding [`.teamcity.yml`](.teamcity.yml) file.
 
 A Fastlane configuration file has been added in [`ios/fastlane/Fastfile`](ios/fastlane/Fastfile) to apply various 
 settings to the Xcode project during build time and increment the iOS build version number. A signed version of the 
