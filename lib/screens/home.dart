@@ -11,7 +11,6 @@ import 'package:testing_app/screens/favorites.dart';
 class HomePage extends StatelessWidget {
   static const routeName = '/';
 
-
   const HomePage({super.key});
 
   @override
